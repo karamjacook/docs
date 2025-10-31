@@ -1,94 +1,1195 @@
----
-title: 'Development'
-description: 'Preview changes locally to update your docs'
----
+# Universal Agent API Documentation
 
-<Info>
-  **Prerequisites**:
-  - Node.js version 19 or higher
-  - A docs repository with a `docs.json` file
-</Info>
+## Endpoint
 
-Follow these steps to install and run Mintlify on your operating system.
-
-<Steps>
-<Step title="Install the Mintlify CLI">
-
-```bash
-npm i -g mint
 ```
-</Step>
-
-<Step title="Preview locally">
-
-Navigate to your docs directory where your `docs.json` file is located, and run the following command:
-
-```bash
-mint dev
+POST https://your-project.supabase.co/functions/v1/universal-agent
 ```
 
-A local preview of your documentation will be available at `http://localhost:3000`.
+## Headers
 
-</Step>
-</Steps>
-
-## Custom ports
-
-By default, Mintlify uses port 3000. You can customize the port Mintlify runs on by using the `--port` flag. For example, to run Mintlify on port 3333, use this command:
-
-```bash
-mint dev --port 3333
+```json
+{
+  "Content-Type": "application/json",
+  "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY"
+}
 ```
 
-If you attempt to run Mintlify on a port that's already in use, it will use the next available port:
+## Request Schema
 
-```md
-Port 3000 is already in use. Trying 3001 instead.
+### Complete JSON Schema
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["prompt", "model"],
+  "properties": {
+    "prompt": {
+      "type": "string",
+      "description": "The main task or question for the agent to execute",
+      "minLength": 1,
+      "example": "Analyze the latest AI trends and create a summary report"
+    },
+    "model": {
+      "type": "object",
+      "required": ["provider", "name", "apiKey"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["openai", "anthropic", "google", "openrouter", "deepseek"],
+          "description": "LLM provider"
+        },
+        "name": {
+          "type": "string",
+          "description": "Model identifier",
+          "examples": [
+            "gpt-4-turbo",
+            "gpt-4o",
+            "claude-3-5-sonnet-20241022",
+            "claude-sonnet-4",
+            "gemini-1.5-pro",
+            "deepseek/deepseek-r1"
+          ]
+        },
+        "apiKey": {
+          "type": "string",
+          "description": "API key for the provider",
+          "pattern": "^sk-"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 0.7,
+          "description": "Sampling temperature"
+        },
+        "maxTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum tokens in response"
+        },
+        "topP": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Nucleus sampling parameter"
+        },
+        "reasoningEffort": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "For reasoning models (o1, o3, etc.)"
+        }
+      }
+    },
+    "system": {
+      "type": "string",
+      "description": "System prompt to guide agent behavior",
+      "default": "You are a helpful AI assistant."
+    },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "maxSteps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10,
+          "description": "Maximum agentic steps (tool calls + responses)"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["fast", "thorough", "deep"],
+          "default": "thorough",
+          "description": "Execution mode affecting prompt augmentation"
+        },
+        "enableSubagents": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the execute_subagent tool"
+        },
+        "maxSubagentDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Maximum nesting depth for subagents"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": ["text", "structured"],
+          "default": "text",
+          "description": "Output format"
+        },
+        "schema": {
+          "type": "object",
+          "description": "JSON Schema for structured output (required if format=structured)",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["object", "array", "string", "number", "boolean"]
+            },
+            "properties": {
+              "type": "object",
+              "description": "Schema properties for object type"
+            },
+            "required": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Required property names"
+            },
+            "items": {
+              "type": "object",
+              "description": "Schema for array items"
+            }
+          }
+        },
+        "verbosity": {
+          "type": "string",
+          "enum": ["minimal", "standard", "detailed"],
+          "default": "standard",
+          "description": "Log verbosity level"
+        },
+        "includeReasoning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include reasoning tokens in response"
+        }
+      }
+    },
+    "stream": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable streaming response (text/event-stream)"
+    },
+    "tools": {
+      "type": "array",
+      "description": "Custom HTTP/webhook tools",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique tool identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name for the tool"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["http", "webhook"],
+            "description": "Tool type"
+          },
+          "description": {
+            "type": "string",
+            "description": "Tool description for the LLM"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Endpoint URL (supports {variable} interpolation)"
+          },
+          "method": {
+            "type": "string",
+            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+            "default": "GET"
+          },
+          "headers": {
+            "type": "object",
+            "description": "HTTP headers"
+          },
+          "body": {
+            "type": "object",
+            "description": "Request body template (supports {variable} interpolation)"
+          },
+          "inputSchema": {
+            "type": "object",
+            "description": "JSON Schema defining tool parameters"
+          },
+          "maxRetries": {
+            "type": "integer",
+            "default": 3,
+            "description": "Max retries for webhook type"
+          }
+        }
+      }
+    },
+    "mcpServers": {
+      "type": "array",
+      "description": "Model Context Protocol servers for external tool integrations",
+      "items": {
+        "type": "object",
+        "required": ["name", "url"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Server identifier"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Server URL"
+          },
+          "transport": {
+            "type": "string",
+            "enum": ["ws", "sse"],
+            "default": "sse",
+            "description": "Transport protocol"
+          }
+        }
+      }
+    },
+    "x402": {
+      "type": "object",
+      "description": "X402 blockchain payment protocol configuration",
+      "required": ["privateKey"],
+      "properties": {
+        "privateKey": {
+          "type": "string",
+          "description": "Ethereum private key for payments",
+          "pattern": "^0x[a-fA-F0-9]{64}$"
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "base",
+            "base-mainnet",
+            "base-sepolia",
+            "ethereum",
+            "ethereum-mainnet",
+            "sepolia",
+            "polygon",
+            "optimism",
+            "arbitrum"
+          ],
+          "default": "base",
+          "description": "Blockchain network"
+        },
+        "facilitatorUrl": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://x402-facilitator.coinbase.com",
+          "description": "X402 facilitator service URL"
+        }
+      }
+    }
+  }
+}
 ```
 
-## Mintlify versions
+## Response Schema
 
-Please note that each CLI release is associated with a specific version of Mintlify. If your local preview does not align with the production version, please update the CLI:
-
-```bash
-npm mint update
+```json
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Whether execution succeeded"
+    },
+    "executionTime": {
+      "type": "integer",
+      "description": "Total execution time in milliseconds"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Generated text response (for text format)"
+        },
+        "object": {
+          "type": "object",
+          "description": "Structured output (for structured format)"
+        },
+        "usage": {
+          "type": "object",
+          "properties": {
+            "inputTokens": { "type": "integer" },
+            "outputTokens": { "type": "integer" },
+            "totalTokens": { "type": "integer" },
+            "reasoningTokens": { "type": "integer" },
+            "cachedInputTokens": { "type": "integer" }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "properties": {
+            "executions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "toolName": { "type": "string" },
+                  "args": { "type": "object" },
+                  "result": { "type": "any" }
+                }
+              }
+            },
+            "callCount": { "type": "integer" }
+          }
+        },
+        "reasoning": {
+          "type": "object",
+          "properties": {
+            "tokens": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "provider": { "type": "string" },
+        "finishReason": { "type": "string" },
+        "mode": { "type": "string" },
+        "steps": { "type": "integer" }
+      }
+    },
+    "logs": {
+      "type": "array",
+      "description": "Complete execution logs (never truncated)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time" },
+          "type": { "type": "string" },
+          "depth": { "type": "integer" },
+          "isSubagent": { "type": "boolean" }
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "stack": { "type": "string" },
+        "hint": { "type": "string" }
+      }
+    }
+  }
+}
 ```
 
-## Validating links
+## Usage Examples
 
-The CLI can assist with validating links in your documentation. To identify any broken links, use the following command:
+### Example 1: Simple Text Generation
 
-```bash
-mint broken-links
+```json
+{
+  "prompt": "Explain quantum computing in simple terms",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-api03-xxxxx"
+  }
+}
 ```
 
-## Deployment
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 2341,
+  "data": {
+    "text": "Quantum computing is a revolutionary approach to computation...",
+    "usage": {
+      "inputTokens": 23,
+      "outputTokens": 156,
+      "totalTokens": 179
+    }
+  },
+  "metadata": {
+    "model": "claude-sonnet-4",
+    "provider": "anthropic",
+    "finishReason": "end_turn",
+    "mode": "thorough",
+    "steps": 1
+  },
+  "logs": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "type": "execution_start",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4"
+    }
+  ]
+}
+```
 
-If the deployment is successful, you should see the following:
+### Example 2: Structured Output
 
-<Frame>
-  <img src="/images/checks-passed.png" alt="Screenshot of a deployment confirmation message that says All checks have passed." style={{ borderRadius: '0.5rem' }} />
-</Frame>
+```json
+{
+  "prompt": "Extract company information from: 'Acme Corp, founded in 2020, revenue $5M, CEO John Smith'",
+  "model": {
+    "provider": "openai",
+    "name": "gpt-4o",
+    "apiKey": "sk-xxxxx"
+  },
+  "output": {
+    "format": "structured",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "companyName": {
+          "type": "string"
+        },
+        "founded": {
+          "type": "number"
+        },
+        "revenue": {
+          "type": "string"
+        },
+        "ceo": {
+          "type": "string"
+        }
+      },
+      "required": ["companyName", "founded"]
+    }
+  }
+}
+```
 
-## Code formatting
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 1823,
+  "data": {
+    "object": {
+      "companyName": "Acme Corp",
+      "founded": 2020,
+      "revenue": "$5M",
+      "ceo": "John Smith"
+    },
+    "usage": {
+      "inputTokens": 45,
+      "outputTokens": 28,
+      "totalTokens": 73
+    }
+  },
+  "metadata": {
+    "model": "gpt-4o",
+    "provider": "openai",
+    "finishReason": "stop"
+  }
+}
+```
 
-We suggest using extensions on your IDE to recognize and format MDX. If you're a VSCode user, consider the [MDX VSCode extension](https://marketplace.visualstudio.com/items?itemName=unifiedjs.vscode-mdx) for syntax highlighting, and [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting.
+### Example 3: Agent with Custom HTTP Tool
 
-## Troubleshooting
+```json
+{
+  "prompt": "Check the weather in San Francisco and tell me if I need an umbrella",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-xxxxx"
+  },
+  "execution": {
+    "maxSteps": 5
+  },
+  "tools": [
+    {
+      "id": "weather_api",
+      "name": "Get Weather",
+      "type": "http",
+      "description": "Get current weather for a city",
+      "url": "https://api.weatherapi.com/v1/current.json?key=YOUR_KEY&q={city}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "City name"
+          }
+        },
+        "required": ["city"]
+      }
+    }
+  ]
+}
+```
 
-<AccordionGroup>
-  <Accordion title='Error: Could not load the "sharp" module using the darwin-arm64 runtime'>
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 3456,
+  "data": {
+    "text": "Based on the current weather in San Francisco, it's partly cloudy with a 20% chance of rain. You probably don't need an umbrella, but it wouldn't hurt to keep one handy just in case.",
+    "usage": {
+      "inputTokens": 89,
+      "outputTokens": 67,
+      "totalTokens": 156
+    },
+    "tools": {
+      "executions": [
+        {
+          "toolName": "weather_api",
+          "args": {
+            "city": "San Francisco"
+          },
+          "result": {
+            "current": {
+              "temp_f": 62,
+              "condition": {
+                "text": "Partly cloudy"
+              },
+              "precip_in": 0.0
+            }
+          }
+        }
+      ],
+      "callCount": 1
+    }
+  },
+  "logs": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "type": "execution_start",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4"
+    },
+    {
+      "timestamp": "2025-01-15T10:00:01.500Z",
+      "type": "tool_execution",
+      "tool": "weather_api",
+      "arguments": {
+        "city": "San Francisco"
+      },
+      "result": {
+        "current": {
+          "temp_f": 62,
+          "condition": { "text": "Partly cloudy" }
+        }
+      },
+      "duration": "234ms"
+    }
+  ]
+}
+```
 
-    This may be due to an outdated version of node. Try the following:
-    1. Remove the currently-installed version of the CLI: `npm remove -g mint`
-    2. Upgrade to Node v19 or higher.
-    3. Reinstall the CLI: `npm i -g mint`
-  </Accordion>
+### Example 4: Subagent Execution
 
-  <Accordion title="Issue: Encountering an unknown error">
-  
-    Solution: Go to the root of your device and delete the `~/.mintlify` folder. Then run `mint dev` again.
-  </Accordion>
-</AccordionGroup>
+```json
+{
+  "prompt": "Research the top 3 AI companies and create a comparison report",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-xxxxx",
+    "temperature": 0.7
+  },
+  "system": "You are a business analyst. Use subagents to delegate specialized research tasks.",
+  "execution": {
+    "enableSubagents": true,
+    "maxSubagentDepth": 2,
+    "maxSteps": 20,
+    "mode": "deep"
+  },
+  "output": {
+    "verbosity": "detailed"
+  }
+}
+```
 
-Curious about what changed in the latest CLI version? Check out the [CLI changelog](https://www.npmjs.com/package/mintlify?activeTab=versions).
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 15678,
+  "data": {
+    "text": "# AI Companies Comparison Report\n\n## OpenAI\n...\n\n## Anthropic\n...\n\n## Google DeepMind\n...",
+    "usage": {
+      "inputTokens": 523,
+      "outputTokens": 1247,
+      "totalTokens": 1770
+    },
+    "tools": {
+      "executions": [
+        {
+          "toolName": "execute_subagent",
+          "args": {
+            "prompt": "Research OpenAI: founding year, key products, recent news",
+            "maxSteps": 3
+          },
+          "result": {
+            "success": true,
+            "data": {
+              "text": "OpenAI was founded in 2015..."
+            },
+            "executionTime": 4532
+          }
+        },
+        {
+          "toolName": "execute_subagent",
+          "args": {
+            "prompt": "Research Anthropic: founding year, key products, recent news",
+            "maxSteps": 3
+          },
+          "result": {
+            "success": true,
+            "data": {
+              "text": "Anthropic was founded in 2021..."
+            },
+            "executionTime": 4123
+          }
+        },
+        {
+          "toolName": "execute_subagent",
+          "args": {
+            "prompt": "Research Google DeepMind: founding year, key products, recent news",
+            "maxSteps": 3
+          },
+          "result": {
+            "success": true,
+            "data": {
+              "text": "Google DeepMind was formed..."
+            },
+            "executionTime": 3876
+          }
+        }
+      ],
+      "callCount": 3
+    }
+  },
+  "metadata": {
+    "model": "claude-sonnet-4",
+    "provider": "anthropic",
+    "finishReason": "end_turn",
+    "mode": "deep",
+    "steps": 4
+  },
+  "logs": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "type": "execution_start",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4",
+      "isSubagent": false,
+      "depth": 0
+    },
+    {
+      "timestamp": "2025-01-15T10:00:01.000Z",
+      "type": "subagent_invocation",
+      "depth": 1,
+      "prompt": "Research OpenAI: founding year, key products...",
+      "hasCustomModel": false,
+      "hasCustomSystem": false
+    },
+    {
+      "timestamp": "2025-01-15T10:00:01.100Z",
+      "type": "execution_start",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4",
+      "isSubagent": true,
+      "depth": 1
+    },
+    {
+      "timestamp": "2025-01-15T10:00:05.632Z",
+      "type": "subagent_complete",
+      "depth": 1,
+      "success": true,
+      "executionTime": 4532
+    },
+    {
+      "timestamp": "2025-01-15T10:00:06.000Z",
+      "type": "subagent_invocation",
+      "depth": 1,
+      "prompt": "Research Anthropic: founding year, key products...",
+      "hasCustomModel": false,
+      "hasCustomSystem": false
+    }
+  ]
+}
+```
+
+### Example 5: X402 Payment Protocol
+
+```json
+{
+  "prompt": "Use the paid AI inference API at https://x402-api.example.com/v1/analyze to analyze this text: 'Machine learning is transforming industries'",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-xxxxx"
+  },
+  "execution": {
+    "maxSteps": 5
+  },
+  "x402": {
+    "privateKey": "0xabcd1234...",
+    "network": "base"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 5234,
+  "data": {
+    "text": "I've analyzed the text using the paid API. The analysis shows positive sentiment about machine learning with high confidence in industry transformation...",
+    "usage": {
+      "inputTokens": 78,
+      "outputTokens": 123,
+      "totalTokens": 201
+    },
+    "tools": {
+      "executions": [
+        {
+          "toolName": "x402_request",
+          "args": {
+            "url": "https://x402-api.example.com/v1/analyze",
+            "method": "POST",
+            "body": {
+              "text": "Machine learning is transforming industries"
+            }
+          },
+          "result": {
+            "success": true,
+            "data": {
+              "sentiment": "positive",
+              "confidence": 0.89,
+              "topics": ["machine learning", "industry transformation"]
+            },
+            "paymentMade": true,
+            "cost": "0.001",
+            "txHash": "0x7f3e..."
+          }
+        }
+      ],
+      "callCount": 1
+    }
+  },
+  "logs": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "type": "x402_initialized",
+      "network": "base",
+      "walletAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5",
+      "toolCount": 6
+    },
+    {
+      "timestamp": "2025-01-15T10:00:02.345Z",
+      "type": "x402_request",
+      "url": "https://x402-api.example.com/v1/analyze",
+      "paymentMade": true,
+      "cost": "0.001",
+      "success": true
+    }
+  ]
+}
+```
+
+### Example 6: MCP Server Integration
+
+```json
+{
+  "prompt": "Search my company's Notion workspace for documents about Q4 planning",
+  "model": {
+    "provider": "openai",
+    "name": "gpt-4-turbo",
+    "apiKey": "sk-xxxxx"
+  },
+  "execution": {
+    "maxSteps": 8
+  },
+  "mcpServers": [
+    {
+      "name": "notion",
+      "url": "wss://mcp-notion.example.com",
+      "transport": "ws"
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 6789,
+  "data": {
+    "text": "I found 5 documents related to Q4 planning in your Notion workspace:\n\n1. Q4 Strategy Overview (updated 3 days ago)\n2. Q4 Budget Proposal...",
+    "usage": {
+      "inputTokens": 145,
+      "outputTokens": 234,
+      "totalTokens": 379
+    },
+    "tools": {
+      "executions": [
+        {
+          "toolName": "mcp_notion_search",
+          "args": {
+            "query": "Q4 planning"
+          },
+          "result": {
+            "results": [
+              {
+                "id": "abc123",
+                "title": "Q4 Strategy Overview",
+                "url": "https://notion.so/abc123"
+              }
+            ]
+          }
+        }
+      ],
+      "callCount": 1
+    }
+  },
+  "logs": [
+    {
+      "timestamp": "2025-01-15T10:00:00.000Z",
+      "type": "mcp_initialization",
+      "serverCount": 1
+    },
+    {
+      "timestamp": "2025-01-15T10:00:01.234Z",
+      "type": "mcp_ready",
+      "toolCount": 3
+    }
+  ]
+}
+```
+
+### Example 7: Complex Multi-Tool Workflow
+
+```json
+{
+  "prompt": "Find the latest Bitcoin price, convert it to EUR, and send 0.01 BTC worth of USDC to 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5",
+  "model": {
+    "provider": "openai",
+    "name": "gpt-4o",
+    "apiKey": "sk-xxxxx",
+    "temperature": 0.3
+  },
+  "execution": {
+    "maxSteps": 15,
+    "mode": "thorough"
+  },
+  "tools": [
+    {
+      "id": "crypto_price",
+      "type": "http",
+      "description": "Get current cryptocurrency prices",
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies={currency}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "coin": { "type": "string" },
+          "currency": { "type": "string" }
+        },
+        "required": ["coin", "currency"]
+      }
+    },
+    {
+      "id": "currency_convert",
+      "type": "http",
+      "description": "Convert between fiat currencies",
+      "url": "https://api.exchangerate.host/convert?from={from}&to={to}&amount={amount}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "amount": { "type": "number" }
+        },
+        "required": ["from", "to", "amount"]
+      }
+    }
+  ],
+  "x402": {
+    "privateKey": "0xabcd1234...",
+    "network": "base"
+  }
+}
+```
+
+### Example 8: Streaming Response
+
+```json
+{
+  "prompt": "Write a long blog post about the future of AI",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-xxxxx"
+  },
+  "stream": true
+}
+```
+
+**Response:** (Server-Sent Events stream)
+```
+data: {"type":"text","text":"The"}
+
+data: {"type":"text","text":" future"}
+
+data: {"type":"text","text":" of"}
+
+data: {"type":"text","text":" AI..."}
+
+data: {"type":"done"}
+```
+
+### Example 9: Reasoning Model (o1/o3)
+
+```json
+{
+  "prompt": "Solve this complex math problem: If a train leaves...",
+  "model": {
+    "provider": "openai",
+    "name": "o1-preview",
+    "apiKey": "sk-xxxxx",
+    "reasoningEffort": "high"
+  },
+  "output": {
+    "includeReasoning": true
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "executionTime": 8932,
+  "data": {
+    "text": "The answer is 45 minutes. Here's how I solved it...",
+    "usage": {
+      "inputTokens": 67,
+      "outputTokens": 89,
+      "totalTokens": 156,
+      "reasoningTokens": 1234
+    },
+    "reasoning": {
+      "tokens": 1234
+    }
+  },
+  "metadata": {
+    "model": "o1-preview",
+    "provider": "openai",
+    "finishReason": "stop"
+  }
+}
+```
+
+### Example 10: Nested Subagents with Different Models
+
+```json
+{
+  "prompt": "Create a comprehensive market analysis report with technical and financial sections",
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4",
+    "apiKey": "sk-ant-xxxxx"
+  },
+  "execution": {
+    "enableSubagents": true,
+    "maxSubagentDepth": 3,
+    "maxSteps": 25
+  },
+  "output": {
+    "verbosity": "detailed"
+  }
+}
+```
+
+The agent internally calls:
+```json
+// Subagent 1
+{
+  "tool": "execute_subagent",
+  "args": {
+    "prompt": "Analyze technical market indicators",
+    "model": {
+      "provider": "openai",
+      "name": "gpt-4o",
+      "apiKey": "sk-xxxxx"
+    },
+    "system": "You are a technical analysis expert"
+  }
+}
+
+// Subagent 2
+{
+  "tool": "execute_subagent",
+  "args": {
+    "prompt": "Analyze financial fundamentals",
+    "model": {
+      "provider": "anthropic",
+      "name": "claude-sonnet-4",
+      "apiKey": "sk-ant-xxxxx"
+    },
+    "system": "You are a financial analyst"
+  }
+}
+```
+
+## Error Responses
+
+### Validation Error
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Validation failed: prompt is required, model.apiKey is required",
+    "type": "ValidationError",
+    "hint": "Check that your request body contains all required fields."
+  }
+}
+```
+
+### API Key Error
+```json
+{
+  "success": false,
+  "executionTime": 234,
+  "error": {
+    "message": "Invalid API key",
+    "type": "AuthenticationError",
+    "hint": "Check that your API key is valid and has the necessary permissions."
+  },
+  "logs": [...],
+  "metadata": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4"
+  }
+}
+```
+
+### Subagent Depth Exceeded
+```json
+{
+  "success": false,
+  "executionTime": 1234,
+  "error": {
+    "message": "Maximum subagent depth (3) exceeded",
+    "type": "ExecutionError",
+    "hint": "Subagent execution failed. Check subagent configuration and maximum depth settings."
+  }
+}
+```
+
+## Built-in Tools
+
+The agent automatically has access to these tools when configured:
+
+### X402 Tools (when `x402` config provided)
+1. **x402_request** - Make HTTP requests to X402-enabled APIs
+2. **x402_check_balance** - Check wallet balance
+3. **x402_get_wallet** - Get wallet address
+4. **blockchain_payment** - Execute direct blockchain payments
+5. **x402_estimate_gas** - Estimate transaction gas costs
+6. **x402_verify_transaction** - Verify transaction status
+
+### Subagent Tool (when `execution.enableSubagents: true`)
+1. **execute_subagent** - Spawn a subagent for specialized tasks
+
+### MCP Tools (when `mcpServers` configured)
+- Tools are dynamically loaded from connected MCP servers
+- Named as `mcp_{server}_{tool_name}`
+
+## Rate Limits
+
+Rate limits depend on the underlying LLM provider:
+- OpenAI: Per API key tier
+- Anthropic: Per API key tier  
+- Google: Per project
+- OpenRouter: Per API key
+
+The edge function itself has no rate limits.
+
+## Best Practices
+
+1. **Use appropriate verbosity**: Set to "minimal" for production, "detailed" for debugging
+2. **Limit max steps**: Set reasonable maxSteps to prevent runaway execution
+3. **Subagent depth**: Keep maxSubagentDepth ≤ 3 for performance
+4. **Tool descriptions**: Provide clear, detailed descriptions for custom tools
+5. **Error handling**: Always check `success: false` and handle errors
+6. **Streaming**: Use for long-form content generation
+7. **Structured output**: Use for data extraction and API responses
+8. **X402**: Check balance before making multiple paid API calls
+9. **MCP**: Reuse servers across requests when possible
+10. **Logs**: Use logs for debugging and observability
+
+## TypeScript Types
+
+```typescript
+interface AgentRequest {
+  prompt: string;
+  model: ModelConfig;
+  system?: string;
+  execution?: ExecutionConfig;
+  output?: OutputConfig;
+  stream?: boolean;
+  tools?: CustomTool[];
+  mcpServers?: MCPServer[];
+  x402?: X402Config;
+}
+
+interface ModelConfig {
+  provider: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'deepseek';
+  name: string;
+  apiKey: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
+}
+
+interface ExecutionConfig {
+  maxSteps?: number;
+  mode?: 'fast' | 'thorough' | 'deep';
+  enableSubagents?: boolean;
+  maxSubagentDepth?: number;
+}
+
+interface OutputConfig {
+  format?: 'text' | 'structured';
+  schema?: JSONSchema;
+  verbosity?: 'minimal' | 'standard' | 'detailed';
+  includeReasoning?: boolean;
+}
+
+interface AgentResponse {
+  success: boolean;
+  executionTime: number;
+  data?: {
+    text?: string;
+    object?: any;
+    usage: TokenUsage;
+    tools?: ToolExecutions;
+    reasoning?: ReasoningData;
+  };
+  metadata: {
+    model: string;
+    provider: string;
+    finishReason: string;
+    mode?: string;
+    steps?: number;
+  };
+  logs: Log[];
+  error?: ErrorDetails;
+}
+```
