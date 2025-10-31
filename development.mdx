@@ -3,15 +3,14 @@
 ## Endpoint
 
 ```
-POST https://your-project.supabase.co/functions/v1/universal-agent
+POST https://api.loomlay.com/api:yWCgta9k/action/agent
 ```
 
 ## Headers
 
 ```json
 {
-  "Content-Type": "application/json",
-  "Authorization": "Bearer YOUR_SUPABASE_ANON_KEY"
+  "Content-Type": "application/json"
 }
 ```
 
@@ -21,7 +20,6 @@ POST https://your-project.supabase.co/functions/v1/universal-agent
 
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "required": ["prompt", "model"],
   "properties": {
