@@ -35,18 +35,18 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
       "properties": {
         "provider": {
           "type": "string",
-          "enum": ["openai", "anthropic", "google", "openrouter", "deepseek"],
-          "description": "LLM provider"
+          "enum": ["openrouter", "openai", "anthropic", "google", "deepseek"],
+          "description": "LLM provider (OpenRouter recommended for widest model selection)"
         },
         "name": {
           "type": "string",
           "description": "Model identifier",
           "examples": [
-            "gpt-4-turbo",
-            "gpt-4o",
-            "claude-3-5-sonnet-20241022",
-            "claude-sonnet-4",
-            "gemini-1.5-pro",
+            "anthropic/claude-sonnet-4",
+            "anthropic/claude-opus-4",
+            "openai/gpt-4o",
+            "openai/gpt-4-turbo",
+            "google/gemini-2.0-flash-exp",
             "deepseek/deepseek-r1"
           ]
         },
@@ -76,7 +76,7 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
         "reasoningEffort": {
           "type": "string",
           "enum": ["low", "medium", "high"],
-          "description": "For reasoning models (o1, o3, etc.)"
+          "description": "For reasoning models (o1, o3, deepseek-r1, etc.)"
         }
       }
     },
@@ -160,11 +160,6 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
         }
       }
     },
-    "stream": {
-      "type": "boolean",
-      "default": false,
-      "description": "Enable streaming response (text/event-stream)"
-    },
     "tools": {
       "type": "array",
       "description": "Custom HTTP/webhook tools",
@@ -237,13 +232,13 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
           "url": {
             "type": "string",
             "format": "uri",
-            "description": "Server URL"
+            "description": "Server URL (SSE endpoint)"
           },
           "transport": {
             "type": "string",
-            "enum": ["ws", "sse"],
+            "enum": ["sse"],
             "default": "sse",
-            "description": "Transport protocol"
+            "description": "Transport protocol (currently only SSE supported)"
           }
         }
       }
@@ -266,10 +261,7 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
             "base-sepolia",
             "ethereum",
             "ethereum-mainnet",
-            "sepolia",
-            "polygon",
-            "optimism",
-            "arbitrum"
+            "sepolia"
           ],
           "default": "base",
           "description": "Blockchain network"
@@ -277,7 +269,7 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
         "facilitatorUrl": {
           "type": "string",
           "format": "uri",
-          "default": "https://x402-facilitator.coinbase.com",
+          "default": "https://x402.org/facilitator",
           "description": "X402 facilitator service URL"
         }
       }
@@ -326,11 +318,24 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
           "properties": {
             "executions": {
               "type": "array",
+              "description": "Tool call executions",
               "items": {
                 "type": "object",
                 "properties": {
                   "toolName": { "type": "string" },
                   "args": { "type": "object" },
+                  "result": { "type": "any" }
+                }
+              }
+            },
+            "fullResults": {
+              "type": "array",
+              "description": "Complete tool results with all data",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "toolCallId": { "type": "string" },
+                  "toolName": { "type": "string" },
                   "result": { "type": "any" }
                 }
               }
@@ -384,15 +389,15 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
 
 ## Usage Examples
 
-### Example 1: Simple Text Generation
+### Example 1: Simple Text Generation with OpenRouter
 
 ```json
 {
   "prompt": "Explain quantum computing in simple terms",
   "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-api03-xxxxx"
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
   }
 }
 ```
@@ -403,7 +408,7 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
   "success": true,
   "executionTime": 2341,
   "data": {
-    "text": "Quantum computing is a revolutionary approach to computation...",
+    "text": "Quantum computing is a revolutionary approach to computation that uses quantum mechanical phenomena like superposition and entanglement. Unlike classical computers that use bits (0 or 1), quantum computers use quantum bits or 'qubits' that can exist in multiple states simultaneously...",
     "usage": {
       "inputTokens": 23,
       "outputTokens": 156,
@@ -411,50 +416,34 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
     }
   },
   "metadata": {
-    "model": "claude-sonnet-4",
-    "provider": "anthropic",
+    "model": "anthropic/claude-sonnet-4",
+    "provider": "openrouter",
     "finishReason": "end_turn",
     "mode": "thorough",
     "steps": 1
-  },
-  "logs": [
-    {
-      "timestamp": "2025-01-15T10:00:00.000Z",
-      "type": "execution_start",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4"
-    }
-  ]
+  }
 }
 ```
 
-### Example 2: Structured Output
+### Example 2: Structured Output - Extract Company Data
 
 ```json
 {
   "prompt": "Extract company information from: 'Acme Corp, founded in 2020, revenue $5M, CEO John Smith'",
   "model": {
-    "provider": "openai",
-    "name": "gpt-4o",
-    "apiKey": "sk-xxxxx"
+    "provider": "openrouter",
+    "name": "openai/gpt-4o",
+    "apiKey": "sk-or-v1-xxxxx"
   },
   "output": {
     "format": "structured",
     "schema": {
       "type": "object",
       "properties": {
-        "companyName": {
-          "type": "string"
-        },
-        "founded": {
-          "type": "number"
-        },
-        "revenue": {
-          "type": "string"
-        },
-        "ceo": {
-          "type": "string"
-        }
+        "companyName": { "type": "string" },
+        "founded": { "type": "number" },
+        "revenue": { "type": "string" },
+        "ceo": { "type": "string" }
       },
       "required": ["companyName", "founded"]
     }
@@ -481,22 +470,22 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
     }
   },
   "metadata": {
-    "model": "gpt-4o",
-    "provider": "openai",
+    "model": "openai/gpt-4o",
+    "provider": "openrouter",
     "finishReason": "stop"
   }
 }
 ```
 
-### Example 3: Agent with Custom HTTP Tool
+### Example 3: Weather Agent with Real API
 
 ```json
 {
-  "prompt": "Check the weather in San Francisco and tell me if I need an umbrella",
+  "prompt": "What's the weather in San Francisco? Should I bring an umbrella?",
   "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-xxxxx"
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
   },
   "execution": {
     "maxSteps": 5
@@ -504,17 +493,17 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
   "tools": [
     {
       "id": "weather_api",
-      "name": "Get Weather",
+      "name": "Get Current Weather",
       "type": "http",
-      "description": "Get current weather for a city",
-      "url": "https://api.weatherapi.com/v1/current.json?key=YOUR_KEY&q={city}",
+      "description": "Get current weather for any city using wttr.in service",
+      "url": "https://wttr.in/{city}?format=j1",
       "method": "GET",
       "inputSchema": {
         "type": "object",
         "properties": {
           "city": {
             "type": "string",
-            "description": "City name"
+            "description": "City name (e.g., 'San Francisco', 'London', 'Tokyo')"
           }
         },
         "required": ["city"]
@@ -530,7 +519,7 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
   "success": true,
   "executionTime": 3456,
   "data": {
-    "text": "Based on the current weather in San Francisco, it's partly cloudy with a 20% chance of rain. You probably don't need an umbrella, but it wouldn't hurt to keep one handy just in case.",
+    "text": "Based on the current weather in San Francisco, it's partly cloudy at 62°F with 0% precipitation. You won't need an umbrella today! The conditions are quite pleasant with light winds.",
     "usage": {
       "inputTokens": 89,
       "outputTokens": 67,
@@ -540,69 +529,78 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
       "executions": [
         {
           "toolName": "weather_api",
-          "args": {
-            "city": "San Francisco"
-          },
+          "args": { "city": "San Francisco" },
           "result": {
-            "current": {
-              "temp_f": 62,
-              "condition": {
-                "text": "Partly cloudy"
-              },
-              "precip_in": 0.0
-            }
+            "current_condition": [{
+              "temp_F": "62",
+              "weatherDesc": [{"value": "Partly cloudy"}],
+              "precipMM": "0.0"
+            }]
           }
         }
       ],
       "callCount": 1
     }
+  }
+}
+```
+
+### Example 4: Crypto Price Check with Real API
+
+```json
+{
+  "prompt": "What's the current Bitcoin price in USD? Is it above $100k?",
+  "model": {
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
   },
-  "logs": [
+  "tools": [
     {
-      "timestamp": "2025-01-15T10:00:00.000Z",
-      "type": "execution_start",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4"
-    },
-    {
-      "timestamp": "2025-01-15T10:00:01.500Z",
-      "type": "tool_execution",
-      "tool": "weather_api",
-      "arguments": {
-        "city": "San Francisco"
-      },
-      "result": {
-        "current": {
-          "temp_f": 62,
-          "condition": { "text": "Partly cloudy" }
-        }
-      },
-      "duration": "234ms"
+      "id": "crypto_price",
+      "name": "Get Crypto Price",
+      "type": "http",
+      "description": "Get current cryptocurrency price from CoinGecko",
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "coin_id": {
+            "type": "string",
+            "description": "Coin ID (bitcoin, ethereum, solana, etc.)"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency (usd, eur, gbp)"
+          }
+        },
+        "required": ["coin_id", "currency"]
+      }
     }
   ]
 }
 ```
 
-### Example 4: Subagent Execution
+### Example 5: Subagent Delegation
 
 ```json
 {
-  "prompt": "Research the top 3 AI companies and create a comparison report",
+  "prompt": "Research and write short articles about: AI trends, quantum computing, and blockchain technology",
   "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-xxxxx",
-    "temperature": 0.7
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
   },
-  "system": "You are a business analyst. Use subagents to delegate specialized research tasks.",
+  "system": "You are a technology journalist. Use subagents to research different topics independently.",
   "execution": {
     "enableSubagents": true,
     "maxSubagentDepth": 2,
-    "maxSteps": 20,
-    "mode": "deep"
+    "maxSteps": 15,
+    "mode": "thorough"
   },
   "output": {
-    "verbosity": "detailed"
+    "verbosity": "standard"
   }
 }
 ```
@@ -611,436 +609,238 @@ POST https://api.loomlay.com/api:yWCgta9k/action/agent
 ```json
 {
   "success": true,
-  "executionTime": 15678,
+  "executionTime": 18432,
   "data": {
-    "text": "# AI Companies Comparison Report\n\n## OpenAI\n...\n\n## Anthropic\n...\n\n## Google DeepMind\n...",
+    "text": "# Technology Research Report\n\n## AI Trends\n[Complete article from subagent 1]\n\n## Quantum Computing\n[Complete article from subagent 2]\n\n## Blockchain Technology\n[Complete article from subagent 3]",
     "usage": {
-      "inputTokens": 523,
-      "outputTokens": 1247,
-      "totalTokens": 1770
+      "inputTokens": 623,
+      "outputTokens": 1847,
+      "totalTokens": 2470
     },
     "tools": {
       "executions": [
         {
           "toolName": "execute_subagent",
           "args": {
-            "prompt": "Research OpenAI: founding year, key products, recent news",
-            "maxSteps": 3
+            "prompt": "Write a 300-word article about current AI trends"
           },
           "result": {
             "success": true,
-            "data": {
-              "text": "OpenAI was founded in 2015..."
-            },
-            "executionTime": 4532
+            "text": "[Complete AI trends article]",
+            "usage": { "inputTokens": 45, "outputTokens": 356 }
           }
         },
         {
           "toolName": "execute_subagent",
           "args": {
-            "prompt": "Research Anthropic: founding year, key products, recent news",
-            "maxSteps": 3
+            "prompt": "Write a 300-word article about quantum computing advances"
           },
           "result": {
             "success": true,
-            "data": {
-              "text": "Anthropic was founded in 2021..."
-            },
-            "executionTime": 4123
+            "text": "[Complete quantum computing article]",
+            "usage": { "inputTokens": 48, "outputTokens": 389 }
           }
         },
         {
           "toolName": "execute_subagent",
           "args": {
-            "prompt": "Research Google DeepMind: founding year, key products, recent news",
-            "maxSteps": 3
+            "prompt": "Write a 300-word article about blockchain technology"
           },
           "result": {
             "success": true,
-            "data": {
-              "text": "Google DeepMind was formed..."
-            },
-            "executionTime": 3876
+            "text": "[Complete blockchain article]",
+            "usage": { "inputTokens": 42, "outputTokens": 367 }
+          }
+        }
+      ],
+      "fullResults": [
+        {
+          "toolCallId": "toolu_01ABC",
+          "toolName": "execute_subagent",
+          "result": {
+            "success": true,
+            "text": "[Complete article text available here]"
           }
         }
       ],
       "callCount": 3
     }
   },
-  "metadata": {
-    "model": "claude-sonnet-4",
-    "provider": "anthropic",
-    "finishReason": "end_turn",
-    "mode": "deep",
-    "steps": 4
-  },
   "logs": [
     {
-      "timestamp": "2025-01-15T10:00:00.000Z",
+      "timestamp": "2025-10-31T10:00:00.000Z",
       "type": "execution_start",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4",
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-4",
       "isSubagent": false,
       "depth": 0
     },
     {
-      "timestamp": "2025-01-15T10:00:01.000Z",
-      "type": "subagent_invocation",
+      "timestamp": "2025-10-31T10:00:02.000Z",
+      "type": "subagent_start",
       "depth": 1,
-      "prompt": "Research OpenAI: founding year, key products...",
-      "hasCustomModel": false,
-      "hasCustomSystem": false
+      "prompt": "Write a 300-word article about current AI trends"
     },
     {
-      "timestamp": "2025-01-15T10:00:01.100Z",
-      "type": "execution_start",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4",
-      "isSubagent": true,
-      "depth": 1
-    },
-    {
-      "timestamp": "2025-01-15T10:00:05.632Z",
+      "timestamp": "2025-10-31T10:00:08.234Z",
       "type": "subagent_complete",
       "depth": 1,
       "success": true,
-      "executionTime": 4532
-    },
-    {
-      "timestamp": "2025-01-15T10:00:06.000Z",
-      "type": "subagent_invocation",
-      "depth": 1,
-      "prompt": "Research Anthropic: founding year, key products...",
-      "hasCustomModel": false,
-      "hasCustomSystem": false
+      "text": "[Complete AI article text]",
+      "usage": { "inputTokens": 45, "outputTokens": 356 }
     }
   ]
 }
 ```
 
-### Example 5: X402 Payment Protocol
+### Example 6: X402 Payment Protocol (Testnet)
 
 ```json
 {
-  "prompt": "Use the paid AI inference API at https://x402-api.example.com/v1/analyze to analyze this text: 'Machine learning is transforming industries'",
+  "prompt": "Use the paid sentiment analysis API to analyze: 'This product is amazing!'",
   "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-xxxxx"
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
   },
   "execution": {
     "maxSteps": 5
   },
+  "tools": [
+    {
+      "id": "sentiment_api",
+      "name": "Sentiment Analysis API",
+      "type": "http",
+      "description": "X402-enabled sentiment analysis API (requires payment)",
+      "url": "https://example-x402-api.com/analyze",
+      "method": "POST",
+      "body": {
+        "text": "{text}"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" }
+        },
+        "required": ["text"]
+      }
+    }
+  ],
   "x402": {
-    "privateKey": "0xabcd1234...",
-    "network": "base"
+    "privateKey": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    "network": "base-sepolia",
+    "facilitatorUrl": "https://x402.org/facilitator"
   }
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "executionTime": 5234,
-  "data": {
-    "text": "I've analyzed the text using the paid API. The analysis shows positive sentiment about machine learning with high confidence in industry transformation...",
-    "usage": {
-      "inputTokens": 78,
-      "outputTokens": 123,
-      "totalTokens": 201
-    },
-    "tools": {
-      "executions": [
-        {
-          "toolName": "x402_request",
-          "args": {
-            "url": "https://x402-api.example.com/v1/analyze",
-            "method": "POST",
-            "body": {
-              "text": "Machine learning is transforming industries"
-            }
-          },
-          "result": {
-            "success": true,
-            "data": {
-              "sentiment": "positive",
-              "confidence": 0.89,
-              "topics": ["machine learning", "industry transformation"]
-            },
-            "paymentMade": true,
-            "cost": "0.001",
-            "txHash": "0x7f3e..."
-          }
-        }
-      ],
-      "callCount": 1
-    }
-  },
-  "logs": [
-    {
-      "timestamp": "2025-01-15T10:00:00.000Z",
-      "type": "x402_initialized",
-      "network": "base",
-      "walletAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5",
-      "toolCount": 6
-    },
-    {
-      "timestamp": "2025-01-15T10:00:02.345Z",
-      "type": "x402_request",
-      "url": "https://x402-api.example.com/v1/analyze",
-      "paymentMade": true,
-      "cost": "0.001",
-      "success": true
-    }
-  ]
-}
-```
+**Note**: X402 enables micropayments for API access. The agent automatically handles payment when receiving HTTP 402 responses.
 
-### Example 6: MCP Server Integration
+### Example 7: GitHub MCP Server Integration
 
 ```json
 {
-  "prompt": "Search my company's Notion workspace for documents about Q4 planning",
+  "prompt": "Search my GitHub repositories for issues mentioning 'bug' and list the most recent 5",
   "model": {
-    "provider": "openai",
-    "name": "gpt-4-turbo",
-    "apiKey": "sk-xxxxx"
+    "provider": "openrouter",
+    "name": "openai/gpt-4o",
+    "apiKey": "sk-or-v1-xxxxx"
   },
   "execution": {
     "maxSteps": 8
   },
   "mcpServers": [
     {
-      "name": "notion",
-      "url": "wss://mcp-notion.example.com",
-      "transport": "ws"
+      "name": "github",
+      "url": "https://mcp-github-server.example.com/sse"
     }
   ]
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "executionTime": 6789,
-  "data": {
-    "text": "I found 5 documents related to Q4 planning in your Notion workspace:\n\n1. Q4 Strategy Overview (updated 3 days ago)\n2. Q4 Budget Proposal...",
-    "usage": {
-      "inputTokens": 145,
-      "outputTokens": 234,
-      "totalTokens": 379
-    },
-    "tools": {
-      "executions": [
-        {
-          "toolName": "mcp_notion_search",
-          "args": {
-            "query": "Q4 planning"
-          },
-          "result": {
-            "results": [
-              {
-                "id": "abc123",
-                "title": "Q4 Strategy Overview",
-                "url": "https://notion.so/abc123"
-              }
-            ]
-          }
-        }
-      ],
-      "callCount": 1
-    }
-  },
-  "logs": [
-    {
-      "timestamp": "2025-01-15T10:00:00.000Z",
-      "type": "mcp_initialization",
-      "serverCount": 1
-    },
-    {
-      "timestamp": "2025-01-15T10:00:01.234Z",
-      "type": "mcp_ready",
-      "toolCount": 3
-    }
-  ]
-}
-```
+**Note**: MCP (Model Context Protocol) servers expose tools like GitHub, Slack, Notion, etc. You need to deploy your own MCP server or use hosted ones. Visit [MCP Registry](https://registry.modelcontextprotocol.io) for available servers.
 
-### Example 7: Complex Multi-Tool Workflow
+### Example 8: Reasoning Model (DeepSeek R1)
 
 ```json
 {
-  "prompt": "Find the latest Bitcoin price, convert it to EUR, and send 0.01 BTC worth of USDC to 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5",
+  "prompt": "Solve this logic puzzle: Three switches control three light bulbs in another room. You can flip the switches but can only enter the room once. How do you determine which switch controls which bulb?",
   "model": {
-    "provider": "openai",
-    "name": "gpt-4o",
-    "apiKey": "sk-xxxxx",
-    "temperature": 0.3
-  },
-  "execution": {
-    "maxSteps": 15,
-    "mode": "thorough"
-  },
-  "tools": [
-    {
-      "id": "crypto_price",
-      "type": "http",
-      "description": "Get current cryptocurrency prices",
-      "url": "https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies={currency}",
-      "method": "GET",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "coin": { "type": "string" },
-          "currency": { "type": "string" }
-        },
-        "required": ["coin", "currency"]
-      }
-    },
-    {
-      "id": "currency_convert",
-      "type": "http",
-      "description": "Convert between fiat currencies",
-      "url": "https://api.exchangerate.host/convert?from={from}&to={to}&amount={amount}",
-      "method": "GET",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "from": { "type": "string" },
-          "to": { "type": "string" },
-          "amount": { "type": "number" }
-        },
-        "required": ["from", "to", "amount"]
-      }
-    }
-  ],
-  "x402": {
-    "privateKey": "0xabcd1234...",
-    "network": "base"
-  }
-}
-```
-
-### Example 8: Streaming Response
-
-```json
-{
-  "prompt": "Write a long blog post about the future of AI",
-  "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-xxxxx"
-  },
-  "stream": true
-}
-```
-
-**Response:** (Server-Sent Events stream)
-```
-data: {"type":"text","text":"The"}
-
-data: {"type":"text","text":" future"}
-
-data: {"type":"text","text":" of"}
-
-data: {"type":"text","text":" AI..."}
-
-data: {"type":"done"}
-```
-
-### Example 9: Reasoning Model (o1/o3)
-
-```json
-{
-  "prompt": "Solve this complex math problem: If a train leaves...",
-  "model": {
-    "provider": "openai",
-    "name": "o1-preview",
-    "apiKey": "sk-xxxxx",
+    "provider": "openrouter",
+    "name": "deepseek/deepseek-r1",
+    "apiKey": "sk-or-v1-xxxxx",
     "reasoningEffort": "high"
   },
   "output": {
-    "includeReasoning": true
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "executionTime": 8932,
-  "data": {
-    "text": "The answer is 45 minutes. Here's how I solved it...",
-    "usage": {
-      "inputTokens": 67,
-      "outputTokens": 89,
-      "totalTokens": 156,
-      "reasoningTokens": 1234
-    },
-    "reasoning": {
-      "tokens": 1234
-    }
-  },
-  "metadata": {
-    "model": "o1-preview",
-    "provider": "openai",
-    "finishReason": "stop"
-  }
-}
-```
-
-### Example 10: Nested Subagents with Different Models
-
-```json
-{
-  "prompt": "Create a comprehensive market analysis report with technical and financial sections",
-  "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4",
-    "apiKey": "sk-ant-xxxxx"
-  },
-  "execution": {
-    "enableSubagents": true,
-    "maxSubagentDepth": 3,
-    "maxSteps": 25
-  },
-  "output": {
+    "includeReasoning": true,
     "verbosity": "detailed"
   }
 }
 ```
 
-The agent internally calls:
+**Response includes reasoning tokens:**
 ```json
-// Subagent 1
 {
-  "tool": "execute_subagent",
-  "args": {
-    "prompt": "Analyze technical market indicators",
-    "model": {
-      "provider": "openai",
-      "name": "gpt-4o",
-      "apiKey": "sk-xxxxx"
+  "success": true,
+  "data": {
+    "text": "Here's the solution:\n\n1. Turn on switch 1 and leave it on for 10 minutes\n2. Turn off switch 1, then turn on switch 2\n3. Enter the room\n\nThe bulb that is ON is controlled by switch 2\nThe bulb that is OFF but WARM is controlled by switch 1\nThe bulb that is OFF and COLD is controlled by switch 3",
+    "usage": {
+      "inputTokens": 67,
+      "outputTokens": 89,
+      "totalTokens": 156,
+      "reasoningTokens": 2847
     },
-    "system": "You are a technical analysis expert"
+    "reasoning": {
+      "tokens": 2847
+    }
   }
 }
+```
 
-// Subagent 2
+### Example 9: Multi-Tool Workflow - Real APIs
+
+```json
 {
-  "tool": "execute_subagent",
-  "args": {
-    "prompt": "Analyze financial fundamentals",
-    "model": {
-      "provider": "anthropic",
-      "name": "claude-sonnet-4",
-      "apiKey": "sk-ant-xxxxx"
+  "prompt": "Get the current Bitcoin price and calculate how much 0.5 BTC is worth in EUR",
+  "model": {
+    "provider": "openrouter",
+    "name": "anthropic/claude-sonnet-4",
+    "apiKey": "sk-or-v1-xxxxx"
+  },
+  "execution": {
+    "maxSteps": 10
+  },
+  "tools": [
+    {
+      "id": "crypto_price",
+      "type": "http",
+      "description": "Get cryptocurrency prices from CoinGecko",
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies={currency}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "coin": { "type": "string", "description": "Coin ID (bitcoin, ethereum, etc.)" },
+          "currency": { "type": "string", "description": "Currency code (usd, eur, gbp)" }
+        },
+        "required": ["coin", "currency"]
+      }
     },
-    "system": "You are a financial analyst"
-  }
+    {
+      "id": "currency_rates",
+      "type": "http",
+      "description": "Get exchange rates from exchangerate-api.com",
+      "url": "https://api.exchangerate-api.com/v4/latest/{base}",
+      "method": "GET",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "base": { "type": "string", "description": "Base currency (USD, EUR, etc.)" }
+        },
+        "required": ["base"]
+      }
+    }
+  ]
 }
 ```
 
@@ -1053,7 +853,7 @@ The agent internally calls:
   "error": {
     "message": "Validation failed: prompt is required, model.apiKey is required",
     "type": "ValidationError",
-    "hint": "Check that your request body contains all required fields."
+    "hint": "Check that your request includes all required fields"
   }
 }
 ```
@@ -1066,12 +866,11 @@ The agent internally calls:
   "error": {
     "message": "Invalid API key",
     "type": "AuthenticationError",
-    "hint": "Check that your API key is valid and has the necessary permissions."
+    "hint": "Check that your API key is valid and has necessary permissions"
   },
-  "logs": [...],
   "metadata": {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4"
+    "provider": "openrouter",
+    "model": "anthropic/claude-sonnet-4"
   }
 }
 ```
@@ -1084,52 +883,70 @@ The agent internally calls:
   "error": {
     "message": "Maximum subagent depth (3) exceeded",
     "type": "ExecutionError",
-    "hint": "Subagent execution failed. Check subagent configuration and maximum depth settings."
+    "hint": "Reduce maxSubagentDepth or simplify the task"
   }
 }
 ```
 
 ## Built-in Tools
 
-The agent automatically has access to these tools when configured:
-
 ### X402 Tools (when `x402` config provided)
-1. **x402_request** - Make HTTP requests to X402-enabled APIs
-2. **x402_check_balance** - Check wallet balance
-3. **x402_get_wallet** - Get wallet address
-4. **blockchain_payment** - Execute direct blockchain payments
-5. **x402_estimate_gas** - Estimate transaction gas costs
-6. **x402_verify_transaction** - Verify transaction status
+1. **x402_request** - Make HTTP requests to X402-enabled APIs with automatic payment
+2. **x402_check_balance** - Check wallet balance for specified assets
+3. **x402_get_wallet** - Get wallet address being used for payments
 
 ### Subagent Tool (when `execution.enableSubagents: true`)
-1. **execute_subagent** - Spawn a subagent for specialized tasks
+1. **execute_subagent** - Delegate tasks to independent subagents with isolated context
 
 ### MCP Tools (when `mcpServers` configured)
-- Tools are dynamically loaded from connected MCP servers
+- Tools loaded dynamically from MCP servers
 - Named as `mcp_{server}_{tool_name}`
+- Visit [MCP Registry](https://registry.modelcontextprotocol.io) to discover servers
 
 ## Rate Limits
 
 Rate limits depend on the underlying LLM provider:
-- OpenAI: Per API key tier
-- Anthropic: Per API key tier  
-- Google: Per project
-- OpenRouter: Per API key
+- **OpenRouter**: Depends on your tier (typically 200-2000 requests/min)
+- **OpenAI**: Per API key tier (tier 1-5)
+- **Anthropic**: Per API key tier
+- **Google**: Per project quota
 
-The edge function itself has no rate limits.
+The API endpoint itself has no rate limits.
 
 ## Best Practices
 
-1. **Use appropriate verbosity**: Set to "minimal" for production, "detailed" for debugging
-2. **Limit max steps**: Set reasonable maxSteps to prevent runaway execution
-3. **Subagent depth**: Keep maxSubagentDepth ≤ 3 for performance
-4. **Tool descriptions**: Provide clear, detailed descriptions for custom tools
-5. **Error handling**: Always check `success: false` and handle errors
-6. **Streaming**: Use for long-form content generation
-7. **Structured output**: Use for data extraction and API responses
+1. **Use OpenRouter for flexibility**: Access 200+ models through a single API key
+2. **Set appropriate verbosity**: Use "minimal" for production, "detailed" for debugging
+3. **Limit max steps**: Set reasonable maxSteps (10-20) to prevent runaway execution
+4. **Subagent depth**: Keep maxSubagentDepth ≤ 3 for optimal performance
+5. **Tool descriptions**: Write clear, detailed descriptions for custom tools
+6. **Error handling**: Always check `success: false` and handle errors gracefully
+7. **Structured output**: Use for data extraction and API integrations
 8. **X402**: Check balance before making multiple paid API calls
-9. **MCP**: Reuse servers across requests when possible
-10. **Logs**: Use logs for debugging and observability
+9. **MCP**: Use hosted MCP servers or deploy your own for production
+10. **Logs**: Enable detailed logging during development for debugging
+
+## Real-World APIs You Can Use
+
+### Free APIs (No Auth Required)
+- **wttr.in** - Weather: `https://wttr.in/{city}?format=j1`
+- **ipapi.co** - IP Geolocation: `https://ipapi.co/{ip}/json/`
+- **exchangerate-api** - Currency: `https://api.exchangerate-api.com/v4/latest/USD`
+- **dog.ceo** - Dog images: `https://dog.ceo/api/breeds/image/random`
+- **catfact.ninja** - Cat facts: `https://catfact.ninja/fact`
+
+### Free APIs (API Key Required)
+- **CoinGecko** - Crypto prices: Free tier available
+- **OpenWeatherMap** - Weather: Free tier 1000 calls/day
+- **NewsAPI** - News: Free tier 100 requests/day
+- **Alpha Vantage** - Stock data: Free tier 25 requests/day
+
+### MCP Servers
+Visit [https://registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io) for the official registry of MCP servers.
+
+### X402 Facilitators
+- **Coinbase CDP**: `https://x402.org/facilitator` (fee-free USDC on Base)
+- Test on Base Sepolia testnet before production use
 
 ## TypeScript Types
 
@@ -1140,14 +957,13 @@ interface AgentRequest {
   system?: string;
   execution?: ExecutionConfig;
   output?: OutputConfig;
-  stream?: boolean;
   tools?: CustomTool[];
   mcpServers?: MCPServer[];
   x402?: X402Config;
 }
 
 interface ModelConfig {
-  provider: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'deepseek';
+  provider: 'openrouter' | 'openai' | 'anthropic' | 'google' | 'deepseek';
   name: string;
   apiKey: string;
   temperature?: number;
@@ -1177,8 +993,12 @@ interface AgentResponse {
     text?: string;
     object?: any;
     usage: TokenUsage;
-    tools?: ToolExecutions;
-    reasoning?: ReasoningData;
+    tools?: {
+      executions: ToolExecution[];
+      fullResults: ToolResult[];
+      callCount: number;
+    };
+    reasoning?: { tokens: number };
   };
   metadata: {
     model: string;
